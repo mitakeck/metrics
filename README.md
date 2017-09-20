@@ -3,6 +3,7 @@ simple cli metrics check tool
 
 ## Usage
 
+```
  usage: metrics [<flags>] <command> [<args> ...]
  
  A command-line metrics checker.
@@ -25,4 +26,4 @@ simple cli metrics check tool
  
    network
      show network information
- 
+``` 
