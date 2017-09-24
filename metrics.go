@@ -13,8 +13,8 @@ type Values map[string]float64
 func getCPUMetrics() (Values, error) {
 	iostatLabel := []string{"cpu.user", "cpu.system", "cpu.idle"}
 	rawOutput, err := pipeline.Output(
-		[]string{"iostat"},
-		[]string{"sed", "-n", "3P"},
+		[]string{"iostat", "-c", "2"}, // 時間がかかるけど、2 度目の取得のほうが正確っぽい。取得間隔(-w)は 1s 以下に指定できなかった
+		[]string{"sed", "-n", "4P"},
 		[]string{"awk", "{print $4 \" \" $5 \" \" $6}"},
 	)
 	if err != nil {
