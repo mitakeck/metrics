@@ -11,7 +11,7 @@ import (
 type Values map[string]float64
 
 func getCPUMetrics() (Values, error) {
-	iostatLabel := []string{"cpu.user", "cpu.system", "cpu.idol"}
+	iostatLabel := []string{"cpu.user", "cpu.system", "cpu.idle"}
 	rawOutput, err := pipeline.Output(
 		[]string{"iostat"},
 		[]string{"sed", "-n", "3P"},
