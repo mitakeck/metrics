@@ -1,116 +1,93 @@
 package main
 
 import (
-	"strconv"
-	"strings"
-
-	pipeline "github.com/mattn/go-pipeline"
+	"github.com/k0kubun/pp"
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/disk"
+	"github.com/shirou/gopsutil/mem"
+	"github.com/shirou/gopsutil/net"
 )
 
 // Values はメトリクス名とその数値の kv map
 type Values map[string]float64
 
 func getCPUMetrics() (Values, error) {
-	iostatLabel := []string{"cpu.user", "cpu.system", "cpu.idle"}
-	rawOutput, err := pipeline.Output(
-		[]string{"iostat", "-c", "2"}, // 時間がかかるけど、2 度目の取得のほうが正確っぽい。取得間隔(-w)は 1s 以下に指定できなかった
-		[]string{"sed", "-n", "4P"},
-		[]string{"awk", "{print $4 \" \" $5 \" \" $6}"},
-	)
+	cpus, err := cpu.Times(true)
 	if err != nil {
 		return nil, err
 	}
-
-	output := string(rawOutput)
-	fields := strings.Fields(output)
-	ret := make(map[string]float64, len(iostatLabel))
-	for i := range iostatLabel {
-		value, err := strconv.ParseFloat(fields[i], 64)
-		if err != nil {
-			return nil, err
-		}
-
-		ret[iostatLabel[i]] = value
+	pp.Println(cpus)
+	ret := make(map[string]float64, 11*len(cpus))
+	for _, c := range cpus {
+		ret["cpu."+c.CPU+".user"] = c.User
+		ret["cpu."+c.CPU+".system"] = c.System
+		ret["cpu."+c.CPU+".idle"] = c.Idle
+		ret["cpu."+c.CPU+".nice"] = c.Nice
+		ret["cpu."+c.CPU+".iowait"] = c.Iowait
+		ret["cpu."+c.CPU+".irq"] = c.Irq
+		ret["cpu."+c.CPU+".softirq"] = c.Softirq
+		ret["cpu."+c.CPU+".steal"] = c.Steal
+		ret["cpu."+c.CPU+".guest"] = c.Guest
+		ret["cpu."+c.CPU+".guestnice"] = c.GuestNice
+		ret["cpu."+c.CPU+".stolen"] = c.Stolen
 	}
 
 	return ret, nil
 }
 
 func getMemoryMetics() (Values, error) {
-	vmstatLabel := []string{"memory.free", "memory.active", "memory.inactive", "memory.total"}
-	rawOutput, err := pipeline.Output(
-		[]string{"vm_stat", "-c", "1", "1"},
-		[]string{"sed", "-n", "3P"},
-		[]string{"awk", "{print $1*4096 \" \" $2*4096 \" \" $3*4096 \" \" ($1+$2+$3)*4096}"},
-	)
+	metric, err := mem.VirtualMemory()
 	if err != nil {
 		return nil, err
 	}
 
-	output := string(rawOutput)
-	fields := strings.Fields(output)
-	ret := make(map[string]float64, len(vmstatLabel))
-	for i := range vmstatLabel {
-		value, err := strconv.ParseFloat(fields[i], 64)
-		if err != nil {
-			return nil, err
-		}
-
-		ret[vmstatLabel[i]] = value
+	ret := map[string]float64{
+		"memory.total":     float64(metric.Total),
+		"memory.available": float64(metric.Available),
+		"memory.used":      float64(metric.Used),
+		"memory.percent":   metric.UsedPercent,
+		"memory.free":      float64(metric.Free),
+		"memory.active":    float64(metric.Active),
+		"memory.inactive":  float64(metric.Inactive),
+		"memory.wired":     float64(metric.Wired),
+		"memory.buffers":   float64(metric.Buffers),
+		"memory.cached":    float64(metric.Cached),
 	}
 
 	return ret, nil
 }
 
 func getNetworkMetics() (Values, error) {
-	netstatLabel := []string{"network.ibyte", "network.obyte"}
-	rawOutput, err := pipeline.Output(
-		[]string{"netstat", "-inb"},
-		[]string{"grep", "en0"},
-		[]string{"head", "-n", "1"},
-		[]string{"awk", "{print $7 \" \" $10}"},
-	)
+	networks, err := net.IOCounters(true)
 	if err != nil {
 		return nil, err
 	}
 
-	output := string(rawOutput)
-	fields := strings.Fields(output)
-	ret := make(map[string]float64, len(netstatLabel))
-	for i := range netstatLabel {
-		value, err := strconv.ParseFloat(fields[i], 64)
-		if err != nil {
-			return nil, err
-		}
+	ret := make(map[string]float64, 2*len(networks))
 
-		ret[netstatLabel[i]] = value
+	for _, network := range networks {
+		ret["network."+network.Name+".sent"] = float64(network.BytesSent)
+		ret["network."+network.Name+".recv"] = float64(network.BytesRecv)
 	}
 
 	return ret, nil
 }
 
 func getDiskMetrics() (Values, error) {
-	dfLabel := []string{"disk.total", "disk.used", "disk.free"}
-	rawOutput, err := pipeline.Output(
-		[]string{"df"},
-		[]string{"grep", "/dev/disk1"},
-		[]string{"head", "-n", "1"},
-		[]string{"awk", "{print $2 \" \" $3 \" \" $4}"},
-	)
+	disks, err := disk.Partitions(false)
 	if err != nil {
 		return nil, err
 	}
+	pp.Println(disks)
 
-	output := string(rawOutput)
-	fields := strings.Fields(output)
-	ret := make(map[string]float64, len(dfLabel))
-	for i := range dfLabel {
-		value, err := strconv.ParseFloat(fields[i], 64)
-		if err != nil {
-			return nil, err
-		}
+	ret := make(map[string]float64, 4*len(disks))
 
-		ret[dfLabel[i]] = value
+	for _, d := range disks {
+		metric, _ := disk.Usage(d.Mountpoint)
+		ret["disk."+d.Device+".total"] = float64(metric.Total)
+		ret["disk."+d.Device+".free"] = float64(metric.Free)
+		ret["disk."+d.Device+".used"] = float64(metric.Used)
+		ret["disk."+d.Device+".percent"] = metric.UsedPercent
 	}
 
 	return ret, nil
