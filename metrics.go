@@ -1,7 +1,6 @@
 package main
 
 import (
-	"github.com/k0kubun/pp"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/mem"
@@ -16,7 +15,7 @@ func getCPUMetrics() (Values, error) {
 	if err != nil {
 		return nil, err
 	}
-	pp.Println(cpus)
+
 	ret := make(map[string]float64, 11*len(cpus))
 	for _, c := range cpus {
 		ret["cpu."+c.CPU+".user"] = c.User
@@ -78,7 +77,6 @@ func getDiskMetrics() (Values, error) {
 	if err != nil {
 		return nil, err
 	}
-	pp.Println(disks)
 
 	ret := make(map[string]float64, 4*len(disks))
 
